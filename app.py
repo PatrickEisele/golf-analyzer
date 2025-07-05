@@ -4,6 +4,7 @@ import tempfile
 import mediapipe as mp
 import math
 import os
+import time
 
 # === Utility functions ===
 def calculate_angle(a, b, c):
@@ -24,27 +25,22 @@ def wrist_velocity(x_hist, y_hist):
     dy = y_hist[-1] - y_hist[-2]
     return (dx**2 + dy**2)**0.5
 
-# === Streamlit UI ===
 st.title("🏌️ Golf Swing Analyzer")
 st.write("Upload a video of your golf swing (MP4 format). The app will analyze key phases and give feedback.")
 
 uploaded_file = st.file_uploader("Choose a video...", type=["mp4"])
 
 if uploaded_file:
-    # Save uploaded video to temp file
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
     tfile.write(uploaded_file.read())
     video_path = tfile.name
 
-    # Initialize mediapipe pose
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose()
     mp_drawing = mp.solutions.drawing_utils
 
-    # Video capture
     cap = cv2.VideoCapture(video_path)
 
-    # Buffers and flags
     wrist_x_hist, wrist_y_hist = [], []
     phase = "preparation"
     backswing_started = False
@@ -57,6 +53,8 @@ if uploaded_file:
     knee_margin = 0.05
     impact_y_margin = 0.05
     impact_velocity = 0.015
+
+    frames = []  # To store frames for replay
 
     stframe = st.empty()
 
@@ -82,34 +80,28 @@ if uploaded_file:
             wrist_x_hist.append(wrist_x)
             wrist_y_hist.append(wrist_y)
 
-            # === Phase Detection ===
             if not backswing_started:
-                # Backswing starts if wrist above right hip y (higher up on image means smaller y)
                 if wrist_y < rhip.y:
                     backswing_started = True
                     phase = "backswing"
                     feedback_summary.append("[BACKSWING] Detected")
             elif backswing_started and not top_detected:
-                # Top of backswing is local minimum wrist_y
                 if len(wrist_y_hist) >= 3 and wrist_y_hist[-2] < wrist_y_hist[-3] and wrist_y_hist[-2] < wrist_y_hist[-1]:
                     top_detected = True
                     phase = "downswing"
                     feedback_summary.append("[DOWNSWING] Detected")
             elif top_detected and not impact_detected:
                 vel = wrist_velocity(wrist_x_hist, wrist_y_hist)
-                # Impact: wrist velocity high & wrist near knee height
                 if vel > impact_velocity and abs(wrist_y - rknee.y) < impact_y_margin:
                     impact_detected = True
                     phase = "impact"
                     feedback_summary.append("[IMPACT] Detected")
             elif impact_detected and not followthrough_started:
-                # Follow-through starts when wrist rises above shoulder height
                 if wrist_y < rshoulder.y:
                     followthrough_started = True
                     phase = "followthrough"
                     feedback_summary.append("[FOLLOW-THROUGH] Detected")
 
-            # === Feedback collection ===
             elbow_angle = calculate_angle([rshoulder.x, rshoulder.y], [relbow.x, relbow.y], [rwrist.x, rwrist.y])
             shoulder_angle = calculate_angle([lhip.x, lhip.y], [lshoulder.x, lshoulder.y], [rshoulder.x, rshoulder.y])
             hip_angle = calculate_angle([lhip.x, lhip.y], [rhip.x, rhip.y], [rshoulder.x, rshoulder.y])
@@ -125,27 +117,26 @@ if uploaded_file:
                 feedback_summary.append("[IMPACT FEEDBACK] Maintain posture through impact zone.")
             elif phase == "followthrough" and "[FOLLOWTHROUGH FEEDBACK]" not in feedback_summary:
                 feedback_summary.append("[FOLLOWTHROUGH FEEDBACK] Let the club release fully.")
-        
+
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
             cv2.putText(frame, f"Phase: {phase}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
+        frames.append(frame)  # save frame for replay
         stframe.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
         frame_idx += 1
 
     cap.release()
     os.remove(video_path)
 
-    # === Final Summary ===
+    # Final Feedback summary
     st.subheader("📝 Feedback Summary")
     if feedback_summary:
-        # Show feedback lines without duplicates
         unique_feedback = []
         for line in feedback_summary:
             if line not in unique_feedback:
                 unique_feedback.append(line)
                 st.write(line)
 
-        # Save to file and provide download
         feedback_file = "swing_feedback.txt"
         with open(feedback_file, "w") as f:
             for line in unique_feedback:
@@ -153,9 +144,17 @@ if uploaded_file:
 
         with open(feedback_file, "rb") as f:
             st.download_button("📄 Download Feedback", f, file_name=feedback_file)
-
     else:
         st.write("No feedback could be generated.")
+
+    # === Video replay with speed control ===
+    st.subheader("▶️ Replay your swing")
+    speed = st.slider("Adjust playback speed (frames per second)", min_value=1, max_value=60, value=30)
+
+    img_placeholder = st.empty()
+    for frame in frames:
+        img_placeholder.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
+        time.sleep(1 / speed)
 
 else:
     st.info("Please upload a video file to analyze your golf swing.")
