@@ -1,3 +1,5 @@
+# Trigger Streamlit rebuild
+
 import streamlit as st
 import cv2
 import tempfile
@@ -25,10 +27,10 @@ def wrist_velocity(x_hist, y_hist):
     dy = y_hist[-1] - y_hist[-2]
     return (dx**2 + dy**2)**0.5
 
-st.title("🏉 Golf Swing Analyzer")
+st.title("🏌️ Golf Swing Analyzer")
 st.write("Upload a video of your golf swing (MP4 format). The app will analyze key phases and give feedback.")
 
-uploaded_file = st.file_uploader("Choose a video...", type=["mp4"])
+uploaded_file = st.file_uploader("Upload a golf swing video", type=["mp4", "mov", "avi"])
 
 if uploaded_file:
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
