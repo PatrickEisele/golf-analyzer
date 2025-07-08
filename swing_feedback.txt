@@ -1,8 +1,6 @@
 [BACKSWING] Detected
 [BACKSWING FEEDBACK] Good backswing structure.
-[BACKSWING FEEDBACK] Limited shoulder turn or bent elbow.
 [DOWNSWING] Detected
-[DOWNSWING FEEDBACK] Hips could rotate more.
 [DOWNSWING FEEDBACK] Good hip action.
 [IMPACT] Detected
 [IMPACT FEEDBACK] Maintain posture through impact zone.
