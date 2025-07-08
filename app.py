@@ -25,7 +25,7 @@ def wrist_velocity(x_hist, y_hist):
     dy = y_hist[-1] - y_hist[-2]
     return (dx**2 + dy**2)**0.5
 
-st.title("🏌️ Golf Swing Analyzer")
+st.title("🏉 Golf Swing Analyzer")
 st.write("Upload a video of your golf swing (MP4 format). The app will analyze key phases and give feedback.")
 
 uploaded_file = st.file_uploader("Choose a video...", type=["mp4"])
@@ -35,12 +35,15 @@ if uploaded_file:
     tfile.write(uploaded_file.read())
     video_path = tfile.name
 
+    # Video preview using st.video
+    st.subheader("🎥 Uploaded Video Preview")
+    st.video(video_path)
+
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose()
     mp_drawing = mp.solutions.drawing_utils
 
     cap = cv2.VideoCapture(video_path)
-
     wrist_x_hist, wrist_y_hist = [], []
     phase = "preparation"
     backswing_started = False
@@ -54,7 +57,7 @@ if uploaded_file:
     impact_y_margin = 0.05
     impact_velocity = 0.015
 
-    frames = []  # To store frames for replay
+    frames = []
 
     stframe = st.empty()
 
@@ -121,15 +124,17 @@ if uploaded_file:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
             cv2.putText(frame, f"Phase: {phase}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        frames.append(frame)  # save frame for replay
+        frames.append(frame)
         stframe.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
         frame_idx += 1
 
     cap.release()
-    os.remove(video_path)
+    try:
+        os.remove(video_path)
+    except PermissionError:
+        st.warning("Temporary video file could not be deleted (maybe still in use).")
 
-    # Final Feedback summary
-    st.subheader("📝 Feedback Summary")
+    st.subheader("📜 Feedback Summary")
     if feedback_summary:
         unique_feedback = []
         for line in feedback_summary:
@@ -147,10 +152,8 @@ if uploaded_file:
     else:
         st.write("No feedback could be generated.")
 
-    # === Video replay with speed control ===
     st.subheader("▶️ Replay your swing")
     speed = st.slider("Adjust playback speed (frames per second)", min_value=1, max_value=60, value=30)
-
     img_placeholder = st.empty()
     for frame in frames:
         img_placeholder.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
